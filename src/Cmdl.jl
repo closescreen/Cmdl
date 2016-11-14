@@ -47,14 +47,14 @@ function find(wants...)
  function name_str_type(w::AbstractString)
     m = match(r"(?P<wantname>.+?)\=(?P<wanttype>\w)", w)
     if m!=nothing
-    t = Base.get(str_type, m[:wanttype], AbstractString)::Type
-    return (m[:wantname], m[:wanttype], t)
+        t = Base.get(str_type, m[:wanttype], AbstractString)::Type
+        return (m[:wantname], m[:wanttype], t)
     end
  
     m = match(r"(?P<wantname>.+)", w)
     if m!=nothing
-    t = Base.get(str_type, "b", AbstractString)::Type
-    return (m[:wantname],"b", t)
+        t = Base.get(str_type, "b", AbstractString)::Type
+        return (m[:wantname],"b", t)
     end
  
     ("", "", AbstractString)
@@ -85,9 +85,9 @@ function find(wants...)
     m = match(w.re, arg)
     if m!=nothing
         if isempty(m.captures)
-        push!(rv, GetOpt(w,true,arg))
+            push!(rv, GetOpt(w,true,arg))
         else
-        push!(rv, GetOpt(w, m.captures[1]|>w.converting, arg))
+            push!(rv, GetOpt(w, m.captures[1]|>w.converting, arg))
         end        
     end
     end
@@ -110,7 +110,7 @@ end
     (will empty array if not found key)
     or
     
-    (arr1, arr2) = first(\"key1=i\",\"key2=i\")
+    (arr1, arr2) = get(\"key1=i\",\"key2=i\")
 """
 get() = nothing
 function get(args...)
