@@ -1,5 +1,43 @@
 module Cmdl
 
+#= v1 возвращает dict
+function dict( args::Array{String,1}; extra::Bool=false )
+ rv=Dict()
+ lastkey=""
+ let args = ( !extra && (x = findfirst( x->x=="--", args))>0 ) ? args[1:x-1] : args
+  st = start(args)
+  while !done(args,st)
+   (arg,st)=next(args,st)
+   info(arg)
+   if (m=match( r"^-(?<k>\w)(?<v>.+)", arg)) != nothing ||
+      (m=match( r"^--(?<k>[\w\-]+)\=(?<v>.+)", arg)) != nothing
+        push!( get!(rv, m[:k], []), m[:v] )
+        lastkey=m[:k]
+   elseif (m=match( r"^-(?<k>\w)$", arg)) != nothing ||
+          (m=match( r"^--(?<k>[\w\-]+)$", arg)) != nothing
+              get!(rv, m[:k],[])
+              lastkey=m[:k] 
+   elseif !isempty( (vv=split( arg, r"\s+");) )
+        append!( get!(rv, lastkey, []), vv )
+   end 
+  end
+ end
+ rv
+end
+
+function args( wants...; extra=true )
+ argd = dict(ARGS, extra=extra)
+ rv = Dict()
+ for w in wants
+  if typeof(w)<:AbstractString
+   get( argd, w, "")
+  end
+ end # не доделано
+end
+
+
+=#
+
 immutable WantOpt
  wantname::AbstractString
  wanttypestr::AbstractString
