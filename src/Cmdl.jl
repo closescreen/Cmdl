@@ -1,12 +1,3 @@
-"""
-tu = Cmdl.dict( ARGS ) |> 
- opt( "file", mustbe=isfile, msg="--file must be a real file" ) |>
- opt( "o", to=Int, mustbe=o->0<o<3) |> 
- opt( "fi") |> 
- opt( "asd",to=Int) |>
- opt( "a", to=Int) |> 
- unexpected( warning=true)
-"""
 module Cmdl
 
 """
@@ -37,22 +28,38 @@ function dict( args::Array{String,1}; extra::Bool=false, debug::Bool=false )
 end
 
 
-function opt( n::AbstractString; to::Type=AbstractString, mustbe::Function=x->true, msg::AbstractString="$n !" )
+"""
+tu = Cmdl.dict( ARGS ) |> 
+ opt( "file", mustbe=isfile, msg="--file must be a real file", musthave=true ) |>
+ opt( "o", to=Int, mustbe=o->0<o<3) |> 
+ opt( "fi", musthave=1) |> 
+ opt( "asd",to=Int, musthave=2) |>
+ opt( "a", to=Int) |> 
+ opt( "new", to=Int, mustbe=x->x>5) |>
+ unexpected( warning=true)
+"""
+function opt( n::AbstractString; to::Type=AbstractString, mustbe::Function=x->true, msg::AbstractString="$n !",
+    musthave::Union{Bool,Int}=false )
  function a( tu::Tuple )
-  dict::Dict = tu[1] 
+  cmddict::Dict = tu[1] 
   found::Dict = (length(tu)>1) ? tu[2] : Dict()
-  a = Base.get( dict, n, [] )
+  nvals = Base.get( cmddict, n, [] )
   vv=[]
-  for s in a
+  if typeof(musthave)<:Bool 
+    musthave && isempty(nvals) && error("Command line option \"$n\" must be defined: $msg")
+  else
+    musthave!=length(nvals) && error("Command line option \"$n\" must have $musthave value(s)")
+  end
+  for s in nvals
    v = (typeof(s)<:to) ? s : parse(to, s) 
    !mustbe(v) && error( "$msg : $n $v")
    push!(vv,v)
   end
   append!( get!( found, n, []), vv)
-  return (dict, found)
+  return (cmddict, found)
  end
 
- a( dict::Dict) = a( (dict,Dict()) )
+ a( cmddict::Dict) = a( (cmddict,Dict()) )
 end
 export opt
 
