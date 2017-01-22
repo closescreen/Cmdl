@@ -1,14 +1,25 @@
+"""
+tu = Cmdl.dict( ARGS ) |> 
+ opt( "file", mustbe=isfile, msg="--file must be a real file" ) |>
+ opt( "o", to=Int, mustbe=o->0<o<3) |> 
+ opt( "fi") |> 
+ opt( "asd",to=Int) |>
+ opt( "a", to=Int) |> 
+ unexpected( warning=true)
+"""
 module Cmdl
 
-#= v1 возвращает dict
-function dict( args::Array{String,1}; extra::Bool=false )
+"""
+Cmdl.dict( ARGS )
+"""
+function dict( args::Array{String,1}; extra::Bool=false, debug::Bool=false )
  rv=Dict()
  lastkey=""
  let args = ( !extra && (x = findfirst( x->x=="--", args))>0 ) ? args[1:x-1] : args
   st = start(args)
   while !done(args,st)
    (arg,st)=next(args,st)
-   info(arg)
+   debug && info(arg)
    if (m=match( r"^-(?<k>\w)(?<v>.+)", arg)) != nothing ||
       (m=match( r"^--(?<k>[\w\-]+)\=(?<v>.+)", arg)) != nothing
         push!( get!(rv, m[:k], []), m[:v] )
@@ -25,6 +36,38 @@ function dict( args::Array{String,1}; extra::Bool=false )
  rv
 end
 
+
+function opt( n::AbstractString; to::Type=AbstractString, mustbe::Function=x->true, msg::AbstractString="$n !" )
+ function a( tu::Tuple )
+  dict::Dict = tu[1] 
+  found::Dict = (length(tu)>1) ? tu[2] : Dict()
+  a = Base.get( dict, n, [] )
+  vv=[]
+  for s in a
+   v = (typeof(s)<:to) ? s : parse(to, s) 
+   !mustbe(v) && error( "$msg : $n $v")
+   push!(vv,v)
+  end
+  append!( get!( found, n, []), vv)
+  return (dict, found)
+ end
+
+ a( dict::Dict) = a( (dict,Dict()) )
+end
+export opt
+
+unexpected(;warning=false) = x->unexpected(x,warning=warning)
+
+function unexpected(tu; warning=false)
+ cmddict, needdict = tu
+ for opt in keys( cmddict )
+  !haskey( needdict, opt) && "unexpected option \"$opt\" in command line args"|> e->warning?warn(e):error(e)
+ end
+ needdict
+end
+export unexpected
+
+#=
 function args( wants...; extra=true )
  argd = dict(ARGS, extra=extra)
  rv = Dict()
@@ -34,17 +77,16 @@ function args( wants...; extra=true )
   end
  end # не доделано
 end
-
-
 =#
 
+#=
 immutable WantOpt
  wantname::AbstractString
  wanttypestr::AbstractString
  wanttype::Type
  converting::Function
  re::Regex
- 
+
  function WantOpt(n,s,t,f)
     if s=="b"
     r = Regex("-{1,2}$n")
@@ -60,29 +102,30 @@ immutable WantOpt
     end 
 
     new(n,s,t,f,r)
- end    
-end 
+ end
+end
 
 immutable GetOpt
  w::WantOpt
  rv
  from::AbstractString
-end 
+end
 
-"""
-    If you want to see full return structure, use find()
-    It work same as get, except, it return full structure
-     for wanted key(s).
-"""
-function find(wants...)
- str_type = Dict( "i"=>Int, "f"=>Float64, "b"=>Bool ) 
- str_convert = Dict( 
-    "i"=>s->parse(Int,s), 
-    "f"=>s->parse(Float64,s),
-    "b"=>s->!isempty(s),
-    "s"=>s->s
- )    
- function name_str_type(w::AbstractString)
+
+function wantopt(w::AbstractString)
+    (n,s,t) = name_str_type(w)
+    f = Base.get(str_convert,s,nothing)
+    WantOpt(n::AbstractString,s::AbstractString,t::Type,f::Function)
+end
+
+
+function wantopt{S<:AbstractString}(w::Pair{S,Function})
+    (n,s,t) = name_str_type(w[1])
+    WantOpt(n,s,t,w[2])
+end
+
+
+function name_str_type(w::AbstractString)
     m = match(r"(?P<wantname>.+?)\=(?P<wanttype>\w)", w)
     if m!=nothing
         t = Base.get(str_type, m[:wanttype], AbstractString)::Type
@@ -96,28 +139,34 @@ function find(wants...)
     end
  
     ("", "", AbstractString)
- end
+end
 
 
- function wantopt{S<:AbstractString}(w::Pair{S,Function})
-    (n,s,t) = name_str_type(w[1])
-    WantOpt(n,s,t,w[2])
- end
+str_type = Dict( "i"=>Int, "f"=>Float64, "b"=>Bool ) 
+str_convert = Dict( 
+    "i"=>s->parse(Int,s), 
+    "f"=>s->parse(Float64,s),
+    "b"=>s->!isempty(s),
+    "s"=>s->s
+)
 
- function wantopt(w::AbstractString)
-    (n,s,t) = name_str_type(w)
-    f = Base.get(str_convert,s,nothing)
-    WantOpt(n::AbstractString,s::AbstractString,t::Type,f::Function)
- end 
 
- 
+"""
+    If you want to see full return structure, use find()
+    It work same as get, except, it return full structure
+     for wanted key(s).
+"""
+function find(wants...)
  wantopts = []
  for w in wants
     push!(wantopts, wantopt(w))
  end
+ rv = findopt(wantopts)
+end
 
- 
- function findopt(w::WantOpt, given_args::Array)
+findopt(ww::Vector{WantOpt}, given_args::Array) = map(w->findopt(w,ARGS) , wantopts)
+
+function findopt(w::WantOpt, given_args::Array)
     rv = []
     for arg in given_args
     m = match(w.re, arg)
@@ -130,10 +179,8 @@ function find(wants...)
     end
     end
     rv  
- end
- 
- rv = map(w->findopt(w,ARGS) , wantopts)::Array
 end
+
 
 """
     If you wait multiple values for the same command line key,
@@ -209,6 +256,6 @@ Found $l matched arguments: $(join(map(a->a.from,rv_arr),",")).
  l==1 ? rv[1] :
  rv         
 end   
-
+=#
 
 end # module
