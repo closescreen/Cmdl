@@ -44,18 +44,33 @@ function opt( n::AbstractString; to::Type=AbstractString, mustbe::Function=x->tr
   cmddict::Dict = tu[1] 
   found::Dict = (length(tu)>1) ? tu[2] : Dict()
   nvals = Base.get( cmddict, n, [] )
-  vv=[]
-  if typeof(musthave)<:Bool 
-    musthave && isempty(nvals) && error("Command line option \"$n\" must be defined: $msg")
+  if to==Bool
+    v = false
+    if haskey( cmddict, n)
+      if length(nvals)>1 error("Option \"$n\" may have only one value, which is one of 'true','false' or nothing")
+      elseif length(nvals)==1
+        v = nvals[1]=="true"?true :
+            nvals[1]=="false"?false:
+            error("Option \"$n\" may have only 'true'|'false'")
+      else # has key, but values array is isempty
+        v = true
+      end
+    end
+    get!( found, n, v)
   else
-    musthave!=length(nvals) && error("Command line option \"$n\" must have $musthave value(s)")
+    vv=[]
+    if typeof(musthave)<:Bool 
+      musthave && isempty(nvals) && error("Command line option \"$n\" must be defined: $msg")
+    else
+      musthave!=length(nvals) && error("Command line option \"$n\" must have $musthave value(s)")
+    end
+    for s in nvals
+     v = (typeof(s)<:to) ? s : parse(to, s) 
+     !mustbe(v) && error( "$msg : $n $v")
+     push!(vv,v)
+    end
+    append!( get!( found, n, []), vv)
   end
-  for s in nvals
-   v = (typeof(s)<:to) ? s : parse(to, s) 
-   !mustbe(v) && error( "$msg : $n $v")
-   push!(vv,v)
-  end
-  append!( get!( found, n, []), vv)
   return (cmddict, found)
  end
 
