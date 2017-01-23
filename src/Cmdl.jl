@@ -37,6 +37,22 @@ tu = Cmdl.dict( ARGS ) |>
  opt( "a", to=Int) |> 
  opt( "new", to=Int, mustbe=x->x>5) |>
  unexpected( warning=true)
+
+Boolean options: 
+
+julia -e'1' -q -i --  --opt1 --opt2=true --opt3=false
+
+julia> using Cmdl
+
+julia> opts = Cmdl.dict( ARGS ) |>
+        opt("opt1",to=Bool ) |>
+        opt("opt2",to=Bool) |>
+        opt("opt3",to=Bool) |>
+        unexpected(warning=true)
+Dict{Any,Any} with 3 entries:
+  "opt3" => false
+  "opt1" => true
+  "opt2" => true 
 """
 function opt( n::AbstractString; to::Type=AbstractString, mustbe::Function=x->true, msg::AbstractString="$n !",
     musthave::Union{Bool,Int}=false )
